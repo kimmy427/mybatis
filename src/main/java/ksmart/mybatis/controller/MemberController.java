@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +13,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import ksmart.mybatis.dto.Member;
 import ksmart.mybatis.dto.MemberLevel;
@@ -30,7 +34,14 @@ public class MemberController {
 	private final MemberMapper memberMapper;
 	
 	@GetMapping("/logout")
-	public String logout(HttpSession session) {
+	public String logout(HttpSession session
+						,@CookieValue(value="loginkeepId", required = false) Cookie cookie
+						,HttpServletResponse response) {
+		if(cookie != null) {
+			cookie.setPath("/");
+			cookie.setMaxAge(0);
+			response.addCookie(cookie);
+		}
 		session.invalidate();
 		return "redirect:/member/login";
 	}
@@ -39,7 +50,8 @@ public class MemberController {
 	public String login( @RequestParam(name="memberId") String memberId
 			  			,@RequestParam(name="memberPw") String memberPw
 			  			,HttpSession session
-			  			,RedirectAttributes reAttr) {
+			  			,RedirectAttributes reAttr
+			  			,HttpServletResponse response) {
 		String redirect = "redirect:/member/login";
 		Map<String, Object> loginResultMap = memberService.loginCheck(memberId, memberPw);
 		boolean loginCheck = (boolean) loginResultMap.get("loginCheck");
@@ -50,6 +62,14 @@ public class MemberController {
 			session.setAttribute("SID", 	memberId);
 			session.setAttribute("SLEVEL", 	memberLevel);
 			session.setAttribute("SNAME", 	memberName);
+			
+			//if(하루동안 유지하는 체크박스 value yes)
+			Cookie cookie = new Cookie("loginKeyId", memberId);
+			cookie.setPath("/");
+			cookie.setMaxAge(60*60*24); //60초 * 60분 * 24 하루
+			response.addCookie(cookie);
+			
+			
 			redirect = "redirect:/";
 		}else {
 			reAttr.addAttribute("result", "일치하는 회원의 정보가 없습니다.");
